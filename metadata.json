@@ -1,0 +1,5 @@
+{
+  "name": "Tak Game",
+  "description": "A two-player, local-multiplayer digital version of the board game Tak. Features a scalable board from 3x3 to 9x9 and customizable themes.",
+  "requestFramePermissions": []
+}
