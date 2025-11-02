@@ -8,7 +8,7 @@ import { THEMES } from './constants';
 const App: React.FC = () => {
     const [theme, setTheme] = useState<Theme>(THEMES.classic);
     const [boardSize, setBoardSize] = useState(5);
-    const [placingPieceType, setPlacingPieceType] = useState<StoneType | null>(null);
+    const [placementPopoverCell, setPlacementPopoverCell] = useState<Coordinates | null>(null);
 
     const {
         board,
@@ -35,58 +35,74 @@ const App: React.FC = () => {
         document.documentElement.style.setProperty('--background-color', theme.backgroundColor);
         document.documentElement.style.setProperty('--text-color', theme.textColor);
     }, [theme]);
+    
+    // Close popover if clicking outside the board
+    useEffect(() => {
+        const handleClickOutside = () => {
+            setPlacementPopoverCell(null);
+        };
+        // Use a timeout to prevent the click that opens the popover from immediately closing it.
+        if (placementPopoverCell) {
+            setTimeout(() => document.addEventListener('click', handleClickOutside), 0);
+        }
+        return () => {
+            document.removeEventListener('click', handleClickOutside);
+        };
+    }, [placementPopoverCell]);
 
     const handleCellClick = useCallback((row: number, col: number) => {
         if (winner) return;
-        
-        if (placingPieceType) {
-            if (board[row][col].length === 0) {
-                placePiece(row, col, placingPieceType);
-            }
-            setPlacingPieceType(null); // Always exit placing mode after a click
+
+        // If we click the cell that already has an open popover, do nothing.
+        if (placementPopoverCell && placementPopoverCell.row === row && placementPopoverCell.col === col) {
             return;
         }
-
+        
         const coordKey = `${row},${col}`;
 
         if (selectedCell) {
+             setPlacementPopoverCell(null);
             // If hand is empty, it means we haven't picked up yet.
-            // A click on the same cell should cancel selection.
             if (row === selectedCell.row && col === selectedCell.col && hand.length === 0) {
                  cancelMove();
                  return;
             }
             // If hand has pieces, we are trying to move
             if (hand.length > 0 && validMoves.has(coordKey)) {
-                // For this simple UI, we'll just use the first possible drop distribution.
-                // A more advanced UI could let the user choose.
                 const drops = validMoves.get(coordKey);
                 if (drops && drops.length > 0) {
                     moveStack({ row, col }, drops[0]);
                 }
             }
         } else {
-            // No cell selected, try to place or select a stack
+            // No cell selected
             if (board[row][col].length === 0) {
-                // In initial placement, clicking an empty square places an opponent piece
                 if (phase === 'INITIAL_PLACEMENT') {
+                    setPlacementPopoverCell(null);
                     placePiece(row, col, StoneType.FLAT);
+                } else {
+                    setPlacementPopoverCell({ row, col });
                 }
-                // In normal play, placing is handled by `placingPieceType` state
             } else {
-                // Stack exists. If it belongs to current player, select it.
+                setPlacementPopoverCell(null);
                 const stack = board[row][col];
                 const topPiece = stack[stack.length - 1];
                 if (topPiece.player === currentPlayer) {
-                    // This will select the cell, controls will show pickup options
-                    pickupStack(row, col, 0); // pickup 0 to just select. Real pickup is via controls.
+                    pickupStack(row, col, 0);
                 }
             }
         }
-    }, [winner, board, phase, currentPlayer, selectedCell, hand, validMoves, placingPieceType, placePiece, moveStack, pickupStack, cancelMove]);
+    }, [winner, board, phase, currentPlayer, selectedCell, hand, validMoves, placementPopoverCell, placePiece, moveStack, pickupStack, cancelMove]);
+    
+    const handlePopoverPlace = (type: StoneType) => {
+        if (placementPopoverCell) {
+            placePiece(placementPopoverCell.row, placementPopoverCell.col, type);
+        }
+        setPlacementPopoverCell(null);
+    };
 
-    const handlePlace = (type: StoneType) => {
-        setPlacingPieceType(type);
+    const handlePopoverCancel = () => {
+        setPlacementPopoverCell(null);
     };
 
     const handlePickup = (count: number) => {
@@ -96,12 +112,8 @@ const App: React.FC = () => {
     }
     
     const handleNewGame = (size: number) => {
-        setPlacingPieceType(null);
+        setPlacementPopoverCell(null);
         initializeGame(size);
-    }
-
-    const cancelPlacing = () => {
-        setPlacingPieceType(null);
     }
 
     return (
@@ -111,13 +123,17 @@ const App: React.FC = () => {
                 <Board 
                     boardData={board} 
                     onCellClick={handleCellClick} 
-                    selectedCell={hand.length === 0 ? selectedCell : null} // only show selection before pickup
+                    selectedCell={hand.length === 0 ? selectedCell : null}
                     validMoves={hand.length > 0 ? validMoves : new Map()}
                     theme={theme}
+                    placementPopoverCell={placementPopoverCell}
+                    onPopoverPlace={handlePopoverPlace}
+                    onPopoverCancel={handlePopoverCancel}
+                    currentPlayer={currentPlayer}
+                    currentPlayerPieces={pieces[currentPlayer]}
                 />
             </div>
             <GameControls
-                // FIX: Pass board data to GameControls.
                 board={board}
                 boardSize={boardSize}
                 setBoardSize={setBoardSize}
@@ -127,7 +143,6 @@ const App: React.FC = () => {
                 winner={winner}
                 pieces={pieces}
                 hand={hand}
-                onPlace={handlePlace}
                 onPickup={handlePickup}
                 onMove={(to: Coordinates, drops: number[]) => moveStack(to, drops)}
                 onCancelMove={cancelMove}
@@ -135,8 +150,6 @@ const App: React.FC = () => {
                 validMoves={validMoves}
                 theme={theme}
                 setTheme={setTheme}
-                placingPieceType={placingPieceType}
-                onCancelPlacing={cancelPlacing}
             />
         </div>
     );

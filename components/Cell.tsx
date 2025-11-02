@@ -1,7 +1,7 @@
-
 import React from 'react';
-import { CellData, Theme } from '../types';
+import { CellData, Theme, StoneType, Player, PlayerPieces } from '../types';
 import PieceDisplay from './PieceDisplay';
+import PlacementPopover from './PlacementPopover';
 
 interface CellProps {
   data: CellData;
@@ -9,9 +9,18 @@ interface CellProps {
   isSelected: boolean;
   isPossibleMove: boolean;
   theme: Theme;
+  isPopoverOpen: boolean;
+  onPopoverPlace: (type: StoneType) => void;
+  onPopoverCancel: () => void;
+  currentPlayer: Player;
+  currentPlayerPieces: PlayerPieces;
+  boardSize: number;
 }
 
-const Cell: React.FC<CellProps> = ({ data, onClick, isSelected, isPossibleMove, theme }) => {
+const Cell: React.FC<CellProps> = ({ 
+  data, onClick, isSelected, isPossibleMove, theme, 
+  isPopoverOpen, onPopoverPlace, onPopoverCancel, currentPlayer, currentPlayerPieces, boardSize 
+}) => {
   const stackHeight = data.length;
 
   const cellStyle = {
@@ -31,8 +40,21 @@ const Cell: React.FC<CellProps> = ({ data, onClick, isSelected, isPossibleMove, 
     <div
       className={`relative aspect-square rounded-lg flex items-center justify-center cursor-pointer transition-all duration-200 ${ringClass}`}
       style={cellStyle}
-      onClick={onClick}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
     >
+      {isPopoverOpen && (
+        <PlacementPopover 
+          player={currentPlayer}
+          pieces={currentPlayerPieces}
+          boardSize={boardSize}
+          theme={theme}
+          onPlace={onPopoverPlace}
+          onCancel={onPopoverCancel}
+        />
+      )}
       {stackHeight > 0 && (
         <div className="relative w-3/4 h-3/4">
           {data.map((piece, index) => (

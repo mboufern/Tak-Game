@@ -257,28 +257,24 @@ const useTakGame = (initialSize: number = 5) => {
 
         const directions = [[0, 1], [0, -1], [1, 0], [-1, 0]];
         for (const [dr, dc] of directions) {
-            let pathClear = true;
             for (let dist = 1; dist <= handSize; dist++) {
                 const newR = row + dr * dist;
                 const newC = col + dc * dist;
 
-                if (newR < 0 || newR >= boardSize || newC < 0 || newC >= boardSize || !pathClear) break;
-                
+                if (newR < 0 || newR >= boardSize || newC < 0 || newC >= boardSize) break;
+
                 const stack = board[newR][newC];
                 const topPiece = stack.length > 0 ? stack[stack.length - 1] : null;
-
-                if (topPiece && (topPiece.type === StoneType.CAPSTONE || topPiece.type === StoneType.STANDING)) {
-                     if (hand[hand.length-1].type === StoneType.CAPSTONE && dist === handSize) {
-                         // can flatten a standing wall, so this is a valid move.
-                     } else {
-                        pathClear = false;
-                     }
-                }
                 
+                // Capstones block movement entirely. No moves can go to or across them.
+                if (topPiece && topPiece.type === StoneType.CAPSTONE) {
+                    break;
+                }
+
                 const key = `${newR},${newC}`;
                 if (!moves.has(key)) moves.set(key, []);
 
-                // Generate possible drop distributions
+                // Generate possible drop distributions for a move of this length
                 function findDistributions(remainingPieces: number, remainingSteps: number, currentDistribution: number[]) {
                     if (remainingSteps === 1) {
                         if(remainingPieces > 0) moves.get(key)!.push([...currentDistribution, remainingPieces]);
@@ -289,6 +285,35 @@ const useTakGame = (initialSize: number = 5) => {
                     }
                 }
                 findDistributions(handSize, dist, []);
+
+                // If the target is a standing wall, filter the generated distributions.
+                // Only a single capstone drop is allowed.
+                if (topPiece && topPiece.type === StoneType.STANDING) {
+                    const validDistributions = moves.get(key)!.filter(distr => {
+                        let piecesDroppedBefore = 0;
+                        for (let i = 0; i < dist - 1; i++) {
+                            piecesDroppedBefore += distr[i];
+                        }
+
+                        const landingPieceIndex = piecesDroppedBefore;
+                        if (landingPieceIndex >= hand.length) return false; 
+
+                        const landingPiece = hand[landingPieceIndex];
+                        const isCapstone = landingPiece.type === StoneType.CAPSTONE;
+                        const isSingleDrop = distr[dist - 1] === 1;
+
+                        return isCapstone && isSingleDrop;
+                    });
+
+                    if (validDistributions.length > 0) {
+                        moves.set(key, validDistributions);
+                    } else {
+                        moves.delete(key);
+                    }
+                    
+                    // A wall always blocks further movement.
+                    break;
+                }
             }
         }
         return moves;
