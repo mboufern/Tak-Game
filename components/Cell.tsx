@@ -2,6 +2,7 @@ import React from 'react';
 import { CellData, Theme, StoneType, Player, PlayerPieces } from '../types';
 import PieceDisplay from './PieceDisplay';
 import PlacementPopover from './PlacementPopover';
+import MovePopover from './MovePopover';
 
 interface CellProps {
   data: CellData;
@@ -9,28 +10,36 @@ interface CellProps {
   isSelected: boolean;
   isPossibleMove: boolean;
   theme: Theme;
-  isPopoverOpen: boolean;
-  onPopoverPlace: (type: StoneType) => void;
-  onPopoverCancel: () => void;
+  
+  isPlacementPopoverOpen: boolean;
+  onPlacementPopoverPlace: (type: StoneType) => void;
+  onPlacementPopoverCancel: () => void;
+  
+  isMovePopoverOpen: boolean;
+  onMovePopoverPickup: (count: number) => void;
+  onMovePopoverCancel: () => void;
+
   currentPlayer: Player;
   currentPlayerPieces: PlayerPieces;
   boardSize: number;
+  hand: CellData;
 }
 
 const Cell: React.FC<CellProps> = ({ 
   data, onClick, isSelected, isPossibleMove, theme, 
-  isPopoverOpen, onPopoverPlace, onPopoverCancel, currentPlayer, currentPlayerPieces, boardSize 
+  isPlacementPopoverOpen, onPlacementPopoverPlace, onPlacementPopoverCancel,
+  isMovePopoverOpen, onMovePopoverPickup, onMovePopoverCancel,
+  currentPlayer, currentPlayerPieces, boardSize, hand
 }) => {
   const stackHeight = data.length;
+  const maxPickup = Math.min(stackHeight, boardSize);
 
   const cellStyle = {
     backgroundColor: theme.cellColor,
   };
   
   let ringClass = 'ring-offset-2 ring-offset-[var(--background-color)]';
-  if (isSelected) {
-    ringClass += ' ring-4 ring-yellow-400';
-  } else if (isPossibleMove) {
+  if (isPossibleMove) {
     ringClass += ' ring-4 ring-green-500';
   }
 
@@ -45,16 +54,26 @@ const Cell: React.FC<CellProps> = ({
         onClick();
       }}
     >
-      {isPopoverOpen && (
+      {isPlacementPopoverOpen && (
         <PlacementPopover 
           player={currentPlayer}
           pieces={currentPlayerPieces}
           boardSize={boardSize}
           theme={theme}
-          onPlace={onPopoverPlace}
-          onCancel={onPopoverCancel}
+          onPlace={onPlacementPopoverPlace}
+          onCancel={onPlacementPopoverCancel}
         />
       )}
+      {isMovePopoverOpen && (
+        <MovePopover
+          maxPickup={maxPickup}
+          theme={theme}
+          onPickup={onMovePopoverPickup}
+          onCancel={onMovePopoverCancel}
+        />
+      )}
+      
+      {/* Render the pieces remaining on the cell */}
       {stackHeight > 0 && (
         <div className="relative w-3/4 h-3/4">
           {data.map((piece, index) => (
@@ -63,7 +82,7 @@ const Cell: React.FC<CellProps> = ({
               className="absolute w-full h-full"
               style={{
                 bottom: `${index * pieceEdgeThickness}px`,
-                zIndex: index,
+                zIndex: index + 1,
               }}
             >
               <PieceDisplay 
@@ -77,6 +96,34 @@ const Cell: React.FC<CellProps> = ({
           ))}
         </div>
       )}
+
+      {/* Render the hovering pieces from the hand if this cell is selected */}
+      {isSelected && hand.length > 0 && (
+        <div
+          className="absolute w-3/4 h-3/4 transform -translate-y-2.5 transition-transform duration-300 ease-out"
+          style={{ filter: 'drop-shadow(0 10px 8px rgb(0 0 0 / 0.2))' }}
+        >
+          {hand.map((piece, index) => (
+            <div
+              key={`hand-${index}`}
+              className="absolute w-full h-full"
+              style={{
+                bottom: `${index * pieceEdgeThickness}px`,
+                zIndex: stackHeight + index + 10,
+              }}
+            >
+              <PieceDisplay
+                piece={piece}
+                player1Color={theme.player1Color}
+                player2Color={theme.player2Color}
+                capstone1Color={theme.capstone1Color}
+                capstone2Color={theme.capstone2Color}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+
       {stackHeight > 1 && (
         <div 
             className="absolute bottom-1 right-1 text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center"

@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from 'react';
-import { BoardData, Player, GamePhase, CellData, StoneType, Coordinates, Piece, PlayerPieces } from '../types';
+import { BoardData, Player, GamePhase, CellData, StoneType, Coordinates, Piece, PlayerPieces, RoadConnection } from '../types';
 import { PIECE_COUNTS } from '../constants';
 
 const useTakGame = (initialSize: number = 5) => {
@@ -319,6 +319,44 @@ const useTakGame = (initialSize: number = 5) => {
         return moves;
     }, [selectedCell, hand, boardSize, board]);
 
+    const roadConnections = useMemo(() => {
+        const connections: { [key in Player]: RoadConnection[] } = {
+            [Player.One]: [],
+            [Player.Two]: [],
+        };
+        if (board.length === 0) return connections;
+
+        const isRoadPiece = (r: number, c: number) => {
+            const stack = board[r][c];
+            if (stack.length === 0) return null;
+            const topPiece = stack[stack.length - 1];
+            return (topPiece.type === StoneType.FLAT || topPiece.type === StoneType.CAPSTONE) ? topPiece : null;
+        };
+
+        for (let r = 0; r < boardSize; r++) {
+            for (let c = 0; c < boardSize; c++) {
+                const piece = isRoadPiece(r, c);
+                if (!piece) continue;
+
+                // Check right neighbor
+                if (c + 1 < boardSize) {
+                    const rightPiece = isRoadPiece(r, c + 1);
+                    if (rightPiece && rightPiece.player === piece.player) {
+                        connections[piece.player].push({ from: { row: r, col: c }, to: { row: r, col: c + 1 } });
+                    }
+                }
+                // Check bottom neighbor
+                if (r + 1 < boardSize) {
+                    const bottomPiece = isRoadPiece(r + 1, c);
+                    if (bottomPiece && bottomPiece.player === piece.player) {
+                        connections[piece.player].push({ from: { row: r, col: c }, to: { row: r + 1, col: c } });
+                    }
+                }
+            }
+        }
+        return connections;
+    }, [board, boardSize]);
+
 
     return {
         boardSize,
@@ -331,6 +369,7 @@ const useTakGame = (initialSize: number = 5) => {
         selectedCell,
         hand,
         validMoves,
+        roadConnections,
         initializeGame,
         placePiece,
         pickupStack,

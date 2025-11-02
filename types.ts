@@ -30,6 +30,11 @@ export interface Coordinates {
   col: number;
 }
 
+export interface RoadConnection {
+  from: Coordinates;
+  to: Coordinates;
+}
+
 export interface PlayerPieces {
   stones: number;
   capstones: number;
